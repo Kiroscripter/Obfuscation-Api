@@ -1,32 +1,42 @@
--- Roblox LocalScript example
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-local HttpService = game:GetService("HttpService")
-local RUN_SERVICE = game:GetService("RunService")
+app.use(cors());
+app.use(bodyParser.json());
 
-local apiUrl = "https://your-api.vercel.app/script?key=YOUR_KEY_HERE"
-local fetchedScript
+// In-memory storage
+const scripts = {};
 
--- Function to fetch script safely
-local function fetchScript()
-    local success, result = pcall(function()
-        return HttpService:GetAsync(apiUrl)
-    end)
-    
-    if success then
-        fetchedScript = result
-        -- Run the fetched script
-        local func = loadstring(fetchedScript)
-        if func then func() end
-        print("Script executed successfully")
-    else
-        warn("Failed to fetch script: "..tostring(result))
-    end
-end
+// Generate random key
+function generateKey(len = 10) {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let s = "";
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
 
--- Fetch script on game start
-fetchScript()
+// Upload script endpoint
+app.post("/upload", (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: "No code provided" });
 
--- Optional: refresh periodically (e.g., every hour)
--- RunService.Heartbeat:Connect(function()
---     if not fetchedScript then fetchScript() end
--- end)
+  const key = generateKey();
+  scripts[key] = { code, created: Date.now() };
+
+  res.json({ success: true, key });
+});
+
+// Fetch script endpoint
+app.get("/script", (req, res) => {
+  const { key } = req.query;
+  if (!key || !scripts[key]) return res.status(403).send("-- Access denied --");
+
+  const scriptData = scripts[key];
+  res.setHeader("Content-Type", "text/plain");
+  res.send(scriptData.code);
+});
+
+app.listen(PORT, () => console.log(`API running on port ${PORT}`));
